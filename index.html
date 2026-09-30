@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diário de Obra</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 p-4 max-w-xl mx-auto font-sans">
+
+  <h1 class="text-xl font-bold text-amber-700 mb-4 text-center">Diário de Obra</h1>
+
+  <!-- Resumo Financeiro -->
+  <div class="grid grid-cols-3 gap-2 mb-4 text-center">
+    <div class="bg-white p-3 rounded shadow">
+      <p class="text-xs text-slate-500 font-bold">Entradas</p>
+      <p id="total-ent" class="text-sm font-extrabold text-emerald-600">R$ 0,00</p>
+    </div>
+    <div class="bg-white p-3 rounded shadow">
+      <p class="text-xs text-slate-500 font-bold">Saídas</p>
+      <p id="total-sai" class="text-sm font-extrabold text-rose-600">R$ 0,00</p>
+    </div>
+    <div class="bg-white p-3 rounded shadow">
+      <p class="text-xs text-slate-500 font-bold">Saldo</p>
+      <p id="total-saldo" class="text-sm font-extrabold text-blue-600">R$ 0,00</p>
+    </div>
+  </div>
+
+  <!-- Formulário -->
+  <form id="form" onsubmit="salvar(event)" class="bg-white p-4 rounded shadow space-y-3 mb-4">
+    <input type="hidden" id="edit-id">
+    <div class="grid grid-cols-2 gap-2">
+      <div>
+        <label class="text-xs font-bold text-slate-600">Tipo</label>
+        <select id="tipo" class="w-full text-sm border rounded p-1.5 bg-white">
+          <option value="SAIDA">Gasto (Saída)</option>
+          <option value="ENTRADA">Verba (Entrada)</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-bold text-slate-600">Valor (R$)</label>
+        <input type="number" step="0.01" id="valor" placeholder="0,00" required class="w-full text-sm border rounded p-1.5">
+      </div>
+    </div>
+    <div>
+      <label class="text-xs font-bold text-slate-600">Descrição / O que foi?</label>
+      <input type="text" id="desc" placeholder="Ex: Cimento, Pedreiro..." required class="w-full text-sm border rounded p-1.5">
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" id="btn-submit" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 rounded text-sm">Adicionar</button>
+      <button type="button" id="btn-cancelar" onclick="limparForm()" class="hidden bg-slate-300 hover:bg-slate-400 text-slate-700 font-bold py-2 px-4 rounded text-sm">Cancelar</button>
+    </div>
+  </form>
+
+  <!-- Histórico -->
+  <div class="bg-white p-4 rounded shadow">
+    <h2 class="font-bold text-sm text-slate-700 mb-2">Histórico</h2>
+    <div id="lista" class="space-y-2 max-h-64 overflow-y-auto text-sm"></div>
+  </div>
+
+  <script>
+    let db = JSON.parse(localStorage.getItem('obra')) || [];
+
+    function salvar(e) {
+      e.preventDefault();
+      const idEdit = document.getElementById('edit-id').value;
+      const tipo = document.getElementById('tipo').value;
+      const valor = parseFloat(document.getElementById('valor').value);
+      const desc = document.getElementById('desc').value;
+
+      if (idEdit) {
+        // Editando item existente
+        db = db.map(i => i.id == idEdit ? { ...i, tipo, valor, desc } : i);
+      } else {
+        // Adicionando novo item
+        db.push({ id: Date.now(), tipo, valor, desc });
+      }
+
+      localStorage.setItem('obra', JSON.stringify(db));
+      limparForm();
+      render();
+    }
+
+    function editar(id) {
+      const item = db.find(i => i.id === id);
+      if (!item) return;
+      document.getElementById('edit-id').value = item.id;
+      document.getElementById('tipo').value = item.tipo;
+      document.getElementById('valor').value = item.valor;
+      document.getElementById('desc').value = item.desc;
+      document.getElementById('btn-submit').innerText = 'Salvar Alteração';
+      document.getElementById('btn-cancelar').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function remover(id) {
+      if (confirm('Deseja realmente apagar este registro?')) {
+        db = db.filter(i => i.id !== id);
+        localStorage.setItem('obra', JSON.stringify(db));
+        render();
+      }
+    }
+
+    function limparForm() {
+      document.getElementById('edit-id').value = '';
+      document.getElementById('valor').value = '';
+      document.getElementById('desc').value = '';
+      document.getElementById('btn-submit').innerText = 'Adicionar';
+      document.getElementById('btn-cancelar').classList.add('hidden');
+    }
+
+    function render() {
+      let ent = 0, sai = 0, html = '';
+      db.slice().reverse().forEach(i => {
+        if (i.tipo === 'ENTRADA') ent += i.valor; else sai += i.valor;
+        html += `<div class="flex justify-between items-center border-b pb-2 pt-1">
+          <div>
+            <span class="font-bold ${i.tipo === 'ENTRADA' ? 'text-emerald-600' : 'text-slate-800'}">${i.desc}</span><br>
+            <span class="text-xs text-slate-400">${i.tipo === 'ENTRADA' ? 'Entrada' : 'Saída'}</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="font-bold ${i.tipo === 'ENTRADA' ? 'text-emerald-600' : 'text-rose-600'}">${i.tipo === 'ENTRADA' ? '+' : '-'} R$ ${i.valor.toFixed(2)}</span>
+            <div class="flex gap-1">
+              <button onclick="editar(${i.id})" class="text-blue-500 hover:text-blue-700 text-xs font-bold px-1.5 py-0.5 bg-blue-50 rounded" title="Editar">✏️</button>
+              <button onclick="remover(${i.id})" class="text-red-500 hover:text-red-700 text-xs font-bold px-1.5 py-0.5 bg-red-50 rounded" title="Apagar">🗑️</button>
+            </div>
+          </div>
+        </div>`;
+      });
+      document.getElementById('total-ent').innerText = `R$ ${ent.toFixed(2)}`;
+      document.getElementById('total-sai').innerText = `R$ ${sai.toFixed(2)}`;
+      document.getElementById('total-saldo').innerText = `R$ ${(ent - sai).toFixed(2)}`;
+      document.getElementById('lista').innerHTML = html || '<p class="text-xs text-slate-400 text-center py-4">Nenhum registro.</p>';
+    }
+
+    render();
+  </script>
+</body>
+</html>
